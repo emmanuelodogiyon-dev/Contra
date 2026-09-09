@@ -119,7 +119,7 @@ export default function GameShell() {
         </div>
         <div className="pad-right">
           <button className="pad-btn pad-jump-btn" aria-label="Jump" {...bind('PadJump')}>▲</button>
-          <button className="pad-btn pad-fire-btn" aria-label="Fire">FIRE</button>
+          <button className="pad-btn pad-fire-btn" aria-label="Fire" {...bind('PadFire')}>FIRE</button>
         </div>
       </div>}
     </div>
