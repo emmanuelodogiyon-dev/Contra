@@ -10,13 +10,14 @@ export default function GameShell() {
   const [started, setStarted] = useState(false)
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
+  const controlsRef = useRef(new Set())
 
   useEffect(() => {
     if (!started) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     let raf = 0, last = performance.now(), spawnTimer = 0, localScore = 0, localLives = 3
-    const keys = new Set()
+    const keys = controlsRef.current
     const player = { x: 120, y: 410, w: 34, h: 58, vx: 0, vy: 0, grounded: false, facing: 1, cooldown: 0, invuln: 0 }
     const bullets = [], enemies = [], particles = []
     let camera = 0
@@ -37,11 +38,12 @@ export default function GameShell() {
     function update(dt) {
       player.cooldown = Math.max(0, player.cooldown - dt)
       player.invuln = Math.max(0, player.invuln - dt)
-      const left = keys.has('ArrowLeft') || keys.has('KeyA'), right = keys.has('ArrowRight') || keys.has('KeyD')
+      const left = keys.has('ArrowLeft') || keys.has('KeyA') || keys.has('PadLeft')
+      const right = keys.has('ArrowRight') || keys.has('KeyD') || keys.has('PadRight')
       player.vx = (right - left) * 235
       if (player.vx) player.facing = Math.sign(player.vx)
-      if ((keys.has('ArrowUp') || keys.has('KeyW')) && player.grounded) { player.vy = -480; player.grounded = false }
-      if (keys.has('Space') || keys.has('KeyJ')) shoot()
+      if ((keys.has('ArrowUp') || keys.has('KeyW') || keys.has('PadJump')) && player.grounded) { player.vy = -480; player.grounded = false }
+      if (keys.has('Space') || keys.has('KeyJ') || keys.has('PadFire')) shoot()
       player.vy += 1100 * dt; player.x += player.vx * dt; player.y += player.vy * dt
       if (player.y + player.h >= 468) { player.y = 468 - player.h; player.vy = 0; player.grounded = true }
       player.x = Math.max(camera + 20, player.x)
@@ -67,10 +69,7 @@ export default function GameShell() {
     function drawSoldier() {
       if (player.invuln > 0 && Math.floor(player.invuln * 12) % 2 === 0) return
       const x = player.x, y = player.y, f = player.facing
-      ctx.save()
-      ctx.translate(x + player.w / 2, y)
-      ctx.scale(f, 1)
-      // Original human soldier: helmet, face, vest, arms, rifle, pants and boots.
+      ctx.save(); ctx.translate(x + player.w / 2, y); ctx.scale(f, 1)
       ctx.fillStyle = '#17222b'; ctx.fillRect(-12, 1, 24, 12)
       ctx.fillStyle = '#b89a72'; ctx.fillRect(-9, 12, 18, 15)
       ctx.fillStyle = '#394b3c'; ctx.fillRect(-14, 26, 28, 20)
@@ -100,15 +99,29 @@ export default function GameShell() {
     }
     function loop(now) { const dt = Math.min((now - last) / 1000, .033); last = now; update(dt); draw(); raf = requestAnimationFrame(loop) }
     raf = requestAnimationFrame(loop)
-    return () => { cancelAnimationFrame(raf); removeEventListener('keydown', down); removeEventListener('keyup', up) }
+    return () => { cancelAnimationFrame(raf); removeEventListener('keydown', down); removeEventListener('keyup', up); keys.clear() }
   }, [started])
+
+  const press = code => e => { e.preventDefault(); controlsRef.current.add(code) }
+  const release = code => e => { e.preventDefault(); controlsRef.current.delete(code) }
+  const bind = code => ({ onPointerDown: press(code), onPointerUp: release(code), onPointerCancel: release(code), onPointerLeave: release(code), onContextMenu: e => e.preventDefault() })
 
   return <section className="shell">
     <header><div><span className="eyebrow">ORIGINAL HUMAN SOLDIER RUN-AND-GUN</span><h1>SHADOW STRIKE</h1></div><div className="hud"><b>{score}</b><span>score</span><b>{lives}</b><span>lives</span></div></header>
     <div className="ad-slot" aria-label="advertisement"><span>ADVERTISEMENT</span><small>Responsive banner slot — connect your approved ad network ID here.</small></div>
     <div className="game-frame">
       <canvas ref={canvasRef} width={W} height={H}/>
-      {!started && <div className="overlay"><h2>{lives <= 0 ? 'MISSION FAILED' : 'READY?'}</h2><p>Control a human soldier, clear enemy waves, and survive.</p><button onClick={() => { setScore(0); setLives(3); setStarted(true) }}>START MISSION</button></div>}
+      {!started && <div className="overlay"><h2>{lives <= 0 ? 'MISSION FAILED' : 'READY?'}</h2><p>Use the gamepad below on phone, tablet, or touchscreen. Keyboard also works on desktop.</p><button onClick={() => { setScore(0); setLives(3); controlsRef.current.clear(); setStarted(true) }}>START MISSION</button></div>}
+      {started && <div className="gamepad" aria-label="Game controls">
+        <div className="pad-left">
+          <button className="pad-btn pad-left-btn" aria-label="Move left" {...bind('PadLeft')}>◀</button>
+          <button className="pad-btn pad-right-btn" aria-label="Move right" {...bind('PadRight')}>▶</button>
+        </div>
+        <div className="pad-right">
+          <button className="pad-btn pad-jump-btn" aria-label="Jump" {...bind('PadJump')}>▲</button>
+          <button className="pad-btn pad-fire-btn" aria-label="Fire">FIRE</button>
+        </div>
+      </div>}
     </div>
     <div className="monetization"><div><strong>Rewarded continue</strong><p>Reserve a single revive for a completed rewarded-ad event from an approved provider.</p></div><div><strong>Supabase leaderboard</strong><p>Scores are stored securely for authenticated users with row-level security enabled.</p></div></div>
   </section>
