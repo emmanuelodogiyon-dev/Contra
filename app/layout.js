@@ -1,8 +1,8 @@
 import './styles.css'
 
 export const metadata = {
-  title: 'Shadow Strike',
-  description: 'Original retro run-and-gun action game.'
+  title: 'Shadow Strike — Human Soldier Run-and-Gun',
+  description: 'An original browser run-and-gun shooter starring a human soldier.',
 }
 
 export default function RootLayout({ children }) {
