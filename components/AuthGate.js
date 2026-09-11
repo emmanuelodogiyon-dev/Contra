@@ -38,6 +38,17 @@ export default function AuthGate() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!session?.user) return
+    const supabase = getSupabase()
+    if (!supabase) return
+    const suggested = String(session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Player').trim()
+    const safeName = suggested.length >= 2 ? suggested.slice(0, 24) : 'Player'
+    supabase.from('profiles').upsert({ id: session.user.id, display_name: safeName }, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.error('Profile sync failed:', error)
+    })
+  }, [session])
+
   async function submit(e) {
     e.preventDefault()
     setBusy(true)
@@ -54,10 +65,12 @@ export default function AuthGate() {
       if (error) setMessage(error.message)
       else setMessage('Login successful.')
     } else {
+      const callsign = displayName.trim() || email.trim().split('@')[0] || 'Player'
+      const safeCallsign = callsign.length >= 2 ? callsign.slice(0, 24) : 'Player'
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { display_name: displayName.trim() || email.trim().split('@')[0] } },
+        options: { data: { display_name: safeCallsign } },
       })
       if (error) setMessage(error.message)
       else if (data.session) setMessage('Account created.')
