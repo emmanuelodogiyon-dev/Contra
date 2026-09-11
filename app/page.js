@@ -1,5 +1,5 @@
-import GameShell from '../components/GameShell'
+import AuthGate from '../components/AuthGate'
 
 export default function Home() {
-  return <main><GameShell /></main>
+  return <main><AuthGate /></main>
 }
