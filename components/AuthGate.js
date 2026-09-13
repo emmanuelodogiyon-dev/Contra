@@ -112,7 +112,7 @@ export default function AuthGate() {
     if (error) {
       setMessage(friendlyAuthError(error))
     } else {
-      setMessage('Fresh confirmation email sent. Open only the newest email link once.')
+      setMessage('Fresh confirmation email sent. Open only the newest email link once, then sign in.')
       setResendCooldown(60)
     }
     setBusy(false)
@@ -154,9 +154,16 @@ export default function AuthGate() {
       if (error) {
         setMessage(friendlyAuthError(error))
       } else if (data.session) {
-        setMessage('Account created.')
+        await supabase.auth.signOut()
+        setMode('login')
+        setPassword('')
+        setDisplayName('')
+        setMessage('Registration successful. Please sign in to continue.')
       } else {
-        setMessage('Account created. Check your email and open the newest confirmation link once, then log in.')
+        setMode('login')
+        setPassword('')
+        setDisplayName('')
+        setMessage('Registration successful. Confirm your email, then sign in to continue.')
       }
     }
     setBusy(false)
