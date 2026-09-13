@@ -141,6 +141,7 @@ export default function AuthGate() {
   return (
     <section className="auth-screen">
       <div className="auth-card">
+        <div className="auth-avatar" aria-hidden="true">🧑🏾‍✈️</div>
         <div className="eyebrow">SHADOW STRIKE // PLAYER ACCESS</div>
         <h1>{mode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT'}</h1>
         <p>Sign in to save your campaign scores to the Shadow Strike leaderboard.</p>
