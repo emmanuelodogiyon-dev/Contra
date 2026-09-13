@@ -4,6 +4,27 @@ import { useEffect, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import GameShell from './GameShell'
 
+function friendlyAuthError(error) {
+  if (!error) return ''
+  const code = String(error.code || '')
+  const status = Number(error.status || 0)
+  const text = String(error.message || '')
+
+  if (code === 'over_email_send_rate_limit' || /email.*rate.?limit|rate.?limit.*email|too many emails/i.test(text)) {
+    return 'EMAIL LIMIT REACHED — Supabase has temporarily limited confirmation emails. Please wait before trying again, or use a custom SMTP provider for production.'
+  }
+
+  if (code === 'over_request_rate_limit' || status === 429 || /too many requests|rate.?limit/i.test(text)) {
+    return 'TOO MANY REQUESTS — please wait a few minutes before trying again.'
+  }
+
+  if (code === 'email_address_not_authorized') {
+    return 'EMAIL NOT AUTHORIZED — configure custom SMTP in Supabase to send confirmation emails to public users.'
+  }
+
+  return text
+}
+
 export default function AuthGate() {
   const [session, setSession] = useState(null)
   const [mode, setMode] = useState('login')
@@ -12,6 +33,7 @@ export default function AuthGate() {
   const [displayName, setDisplayName] = useState('')
   const [busy, setBusy] = useState(true)
   const [message, setMessage] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   useEffect(() => {
     const supabase = getSupabase()
@@ -49,6 +71,14 @@ export default function AuthGate() {
   }, [])
 
   useEffect(() => {
+    if (resendCooldown <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setResendCooldown(value => Math.max(0, value - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [resendCooldown])
+
+  useEffect(() => {
     if (!session?.user) return
     const supabase = getSupabase()
     if (!supabase) return
@@ -66,6 +96,11 @@ export default function AuthGate() {
       setMessage('Enter your registration email first.')
       return
     }
+    if (resendCooldown > 0) {
+      setMessage(`Please wait ${resendCooldown}s before requesting another confirmation email.`)
+      return
+    }
+
     setBusy(true)
     setMessage('Sending a fresh confirmation email…')
     const { error } = await supabase.auth.resend({
@@ -73,7 +108,13 @@ export default function AuthGate() {
       email: target,
       options: { emailRedirectTo: window.location.origin },
     })
-    setMessage(error ? error.message : 'Fresh confirmation email sent. Open only the newest email link once.')
+
+    if (error) {
+      setMessage(friendlyAuthError(error))
+    } else {
+      setMessage('Fresh confirmation email sent. Open only the newest email link once.')
+      setResendCooldown(60)
+    }
     setBusy(false)
   }
 
@@ -94,7 +135,7 @@ export default function AuthGate() {
         if (/confirm|verified|email/i.test(error.message)) {
           setMessage(`${error.message} You can request a fresh confirmation email below.`)
         } else {
-          setMessage(error.message)
+          setMessage(friendlyAuthError(error))
         }
       } else {
         setMessage('Login successful.')
@@ -111,7 +152,7 @@ export default function AuthGate() {
         },
       })
       if (error) {
-        setMessage(error.message)
+        setMessage(friendlyAuthError(error))
       } else if (data.session) {
         setMessage('Account created.')
       } else {
@@ -164,8 +205,8 @@ export default function AuthGate() {
             {busy ? 'PLEASE WAIT…' : mode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT'}
           </button>
         </form>
-        <button className="auth-switch" type="button" onClick={resendConfirmation} disabled={busy}>
-          RESEND CONFIRMATION EMAIL
+        <button className="auth-switch" type="button" onClick={resendConfirmation} disabled={busy || resendCooldown > 0}>
+          {resendCooldown > 0 ? `RESEND AVAILABLE IN ${resendCooldown}s` : 'RESEND CONFIRMATION EMAIL'}
         </button>
         {message && <div className="auth-message" role="status">{message}</div>}
         <button className="auth-switch" type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage('') }}>
