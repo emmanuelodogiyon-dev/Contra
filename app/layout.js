@@ -8,10 +8,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <head>
-        <script src="https://pl31341525.profitableratecpmnetwork.com/25/53/a9/2553a9ba8bac305c7d3967d58fc0687c.js"></script>
-      </head>
-      <body>{children}</body>
+      <head />
+      <body>
+        {children}
+        <script src="https://pl31333770.profitableratecpmnetwork.com/4c/1d/79/4c1d795ce496ee030b848c66e15069b5.js"></script>
+      </body>
     </html>
   )
 }
