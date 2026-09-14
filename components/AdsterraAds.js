@@ -2,35 +2,23 @@
 
 import { useEffect } from 'react'
 
-function mountAdCode(container, code) {
-  if (!container || !code?.trim()) return false
-  container.innerHTML = ''
-  const template = document.createElement('template')
-  template.innerHTML = code
-  Array.from(template.content.childNodes).forEach((node) => {
-    if (node.nodeName === 'SCRIPT') {
-      const script = document.createElement('script')
-      Array.from(node.attributes).forEach((attr) => script.setAttribute(attr.name, attr.value))
-      script.text = node.textContent || ''
-      container.appendChild(script)
-    } else {
-      container.appendChild(node.cloneNode(true))
-    }
-  })
-  return true
-}
+const SOCIAL_BAR_CODE = `<script src="https://pl31333770.profitableratecpmnetwork.com/4c/1d/79/4c1d795ce496ee030b848c66e15069b5.js"></script>`
 
 export default function AdsterraAds() {
   useEffect(() => {
-    const socialBarCode = process.env.NEXT_PUBLIC_ADSTERRA_SOCIALBAR_CODE
-    if (!socialBarCode?.trim()) return undefined
+    if (document.querySelector('[data-shadow-strike-socialbar]')) return undefined
 
     const holder = document.createElement('div')
     holder.dataset.shadowStrikeSocialbar = 'true'
     holder.setAttribute('aria-hidden', 'true')
     holder.style.display = 'contents'
     document.body.appendChild(holder)
-    mountAdCode(holder, socialBarCode)
+
+    const script = document.createElement('script')
+    script.src = 'https://pl31333770.profitableratecpmnetwork.com/4c/1d/79/4c1d795ce496ee030b848c66e15069b5.js'
+    script.async = true
+    script.dataset.shadowStrikeAd = 'socialbar'
+    holder.appendChild(script)
 
     return () => holder.remove()
   }, [])
