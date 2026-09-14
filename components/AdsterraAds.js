@@ -2,6 +2,17 @@
 
 import { useEffect, useRef } from 'react'
 
+const ADSTERRA_BANNER_CODE = `<script>
+  atOptions = {
+    'key' : 'ffa17968ad8c3093cebf49845263d6e6',
+    'format' : 'iframe',
+    'height' : 60,
+    'width' : 468,
+    'params' : {}
+  };
+</script>
+<script src="https://www.highrevenueformat.com/ffa17968ad8c3093cebf49845263d6e6/invoke.js"></script>`
+
 function mountAdCode(container, code) {
   if (!container || !code?.trim()) return false
   container.innerHTML = ''
@@ -24,14 +35,14 @@ export default function AdsterraAds() {
   const nativeRef = useRef(null)
 
   useEffect(() => {
-    const bannerCode = process.env.NEXT_PUBLIC_ADSTERRA_BANNER_CODE
+    const bannerCode = process.env.NEXT_PUBLIC_ADSTERRA_BANNER_CODE || ADSTERRA_BANNER_CODE
     const nativeCode = process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_CODE
     const socialBarCode = process.env.NEXT_PUBLIC_ADSTERRA_SOCIALBAR_CODE
     let observer
 
     const install = () => {
       const bannerSlot = document.querySelector('.ad-slot')
-      if (bannerSlot && bannerCode?.trim()) mountAdCode(bannerSlot, bannerCode)
+      if (bannerSlot && bannerCode?.trim() && !bannerSlot.querySelector('iframe')) mountAdCode(bannerSlot, bannerCode)
 
       if (nativeRef.current && nativeCode?.trim()) mountAdCode(nativeRef.current, nativeCode)
 
@@ -48,7 +59,7 @@ export default function AdsterraAds() {
     }
 
     install()
-    if (bannerCode?.trim() && !document.querySelector('.ad-slot')) {
+    if (!document.querySelector('.ad-slot')) {
       observer = new MutationObserver(install)
       observer.observe(document.body, { childList: true, subtree: true })
     }
