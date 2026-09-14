@@ -13,8 +13,6 @@ const ADSTERRA_BANNER_CODE = `<script>
 </script>
 <script src="https://www.highrevenueformat.com/ffa17968ad8c3093cebf49845263d6e6/invoke.js"></script>`
 
-const ADSTERRA_EXTRA_SCRIPT = `<script src="https://pl31333770.profitableratecpmnetwork.com/4c/1d/79/4c1d795ce496ee030b848c66e15069b5.js"></script>`
-
 function mountAdCode(container, code) {
   if (!container || !code?.trim()) return false
   container.innerHTML = ''
@@ -57,15 +55,6 @@ export default function AdsterraAds() {
         mountAdCode(holder, socialBarCode)
       }
 
-      if (!document.querySelector('[data-shadow-strike-extra-ad]')) {
-        const holder = document.createElement('div')
-        holder.dataset.shadowStrikeExtraAd = 'true'
-        holder.setAttribute('aria-hidden', 'true')
-        holder.style.display = 'contents'
-        document.body.appendChild(holder)
-        mountAdCode(holder, ADSTERRA_EXTRA_SCRIPT)
-      }
-
       return Boolean(bannerSlot || nativeCode || socialBarCode)
     }
 
@@ -78,7 +67,6 @@ export default function AdsterraAds() {
     return () => {
       observer?.disconnect()
       document.querySelector('[data-shadow-strike-socialbar]')?.remove()
-      document.querySelector('[data-shadow-strike-extra-ad]')?.remove()
     }
   }, [])
 
