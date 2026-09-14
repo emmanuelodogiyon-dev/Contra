@@ -1,0 +1,65 @@
+name: Add Social Bar ads
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply Social Bar integration
+        shell: bash
+        run: |
+          cat > components/SocialBarAds.js <<'EOF'
+          'use client'
+
+          import { useEffect } from 'react'
+
+          const SCRIPT_SRC = 'https://pl31341524.profitableratecpmnetwork.com/be/07/72/be077243b749930a02e277af96dcaa5b.js'
+
+          export default function SocialBarAds({ active }) {
+            useEffect(() => {
+              if (!active) return undefined
+              const marker = 'data-shadow-strike-socialbar'
+              if (document.querySelector(`[${marker}]`)) return undefined
+
+              const script = document.createElement('script')
+              script.src = SCRIPT_SRC
+              script.async = true
+              script.setAttribute(marker, 'true')
+              document.body.appendChild(script)
+
+              return () => script.remove()
+            }, [active])
+
+            return null
+          }
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('components/GameShell.js')
+          s = p.read_text()
+          s = s.replace("import { createAudio } from '../lib/audio'", "import { createAudio } from '../lib/audio'\nimport SocialBarAds from './SocialBarAds'")
+          old = '<div className="ad-slot" aria-label="advertisement"><span>ADVERTISEMENT</span><small>Responsive banner slot — connect your approved ad network ID here.</small></div>'
+          s = s.replace(old, '')
+          old_return = 'return <section className="shell"><header>'
+          new_return = "return <section className=\"shell\"><SocialBarAds active={!started && (status==='ready'||status==='failed')} /><header>"
+          if old_return not in s:
+              raise SystemExit('GameShell return marker not found')
+          s = s.replace(old_return, new_return, 1)
+          p.write_text(s)
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add components/GameShell.js components/SocialBarAds.js .github/workflows/add-socialbar-ads.yml
+          git commit -m 'Add Social Bar ads before game and on loss'
+          git rm .github/workflows/add-socialbar-ads.yml
+          git commit -m 'Remove temporary Social Bar setup workflow'
+          git push
