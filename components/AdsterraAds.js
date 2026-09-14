@@ -5,12 +5,9 @@ import { useEffect, useRef } from 'react'
 function mountAdCode(container, code) {
   if (!container || !code?.trim()) return false
   container.innerHTML = ''
-
   const template = document.createElement('template')
   template.innerHTML = code
-  const nodes = Array.from(template.content.childNodes)
-
-  nodes.forEach((node) => {
+  Array.from(template.content.childNodes).forEach((node) => {
     if (node.nodeName === 'SCRIPT') {
       const script = document.createElement('script')
       Array.from(node.attributes).forEach((attr) => script.setAttribute(attr.name, attr.value))
@@ -20,7 +17,6 @@ function mountAdCode(container, code) {
       container.appendChild(node.cloneNode(true))
     }
   })
-
   return true
 }
 
@@ -31,30 +27,35 @@ export default function AdsterraAds() {
     const bannerCode = process.env.NEXT_PUBLIC_ADSTERRA_BANNER_CODE
     const nativeCode = process.env.NEXT_PUBLIC_ADSTERRA_NATIVE_CODE
     const socialBarCode = process.env.NEXT_PUBLIC_ADSTERRA_SOCIALBAR_CODE
+    let observer
 
-    // The existing Shadow Strike .ad-slot is the main banner position.
-    const bannerSlot = document.querySelector('.ad-slot')
-    if (bannerSlot && bannerCode?.trim()) {
-      mountAdCode(bannerSlot, bannerCode)
+    const install = () => {
+      const bannerSlot = document.querySelector('.ad-slot')
+      if (bannerSlot && bannerCode?.trim()) mountAdCode(bannerSlot, bannerCode)
+
+      if (nativeRef.current && nativeCode?.trim()) mountAdCode(nativeRef.current, nativeCode)
+
+      if (socialBarCode?.trim() && !document.querySelector('[data-shadow-strike-socialbar]')) {
+        const holder = document.createElement('div')
+        holder.dataset.shadowStrikeSocialbar = 'true'
+        holder.setAttribute('aria-hidden', 'true')
+        holder.style.display = 'contents'
+        document.body.appendChild(holder)
+        mountAdCode(holder, socialBarCode)
+      }
+
+      return Boolean(bannerSlot || nativeCode || socialBarCode)
     }
 
-    // Social Bar is a page-level script and should only be mounted once.
-    if (socialBarCode?.trim() && !document.querySelector('[data-shadow-strike-socialbar]')) {
-      const holder = document.createElement('div')
-      holder.dataset.shadowStrikeSocialbar = 'true'
-      holder.setAttribute('aria-hidden', 'true')
-      holder.style.display = 'contents'
-      document.body.appendChild(holder)
-      mountAdCode(holder, socialBarCode)
-    }
-
-    if (nativeRef.current && nativeCode?.trim()) {
-      mountAdCode(nativeRef.current, nativeCode)
+    install()
+    if (bannerCode?.trim() && !document.querySelector('.ad-slot')) {
+      observer = new MutationObserver(install)
+      observer.observe(document.body, { childList: true, subtree: true })
     }
 
     return () => {
-      const holder = document.querySelector('[data-shadow-strike-socialbar]')
-      holder?.remove()
+      observer?.disconnect()
+      document.querySelector('[data-shadow-strike-socialbar]')?.remove()
     }
   }, [])
 
