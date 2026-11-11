@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { getAdminSupabase } from '../../../../lib/server/supabase-admin'
-export const runtime='nodejs'
-export async function POST(request){if(process.env.SHADOW_STRIKE_CASH_ENABLED!=='true')return NextResponse.json({error:'Cash tournament score submissions are disabled.'},{status:409});return NextResponse.json({error:'Cash tournament scores require server-authoritative replay verification, which is not enabled.'},{status:503});try{const token=(request.headers.get('authorization')||'').replace(/^Bearer /,'');if(!token)return NextResponse.json({error:'Sign in required.'},{status:401});const url=process.env.NEXT_PUBLIC_SUPABASE_URL||'https://ifvteqtimhisrweaihid.supabase.co',key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_5aPcEtQvyw8xReetWalPSA_OHtyQXn8';const auth=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});const {data:{user},error:ae}=await auth.auth.getUser(token);if(ae||!user)return NextResponse.json({error:'Invalid session.'},{status:401});const b=await request.json();const tournamentId=String(b.tournamentId||''),score=Number(b.score),duration=Number(b.durationMs);if(!/^[0-9a-f-]{36}$/i.test(tournamentId)||!Number.isSafeInteger(score)||score<0||score>100000000||!Number.isSafeInteger(duration)||duration<1000||duration>7200000)return NextResponse.json({error:'Invalid score submission.'},{status:400});const db=getAdminSupabase();const {data:entry,error:ee}=await db.from('tournament_entries').select('id,payment_status,entry_status,tournament_events!inner(status,ends_at)').eq('tournament_id',tournamentId).eq('user_id',user.id).maybeSingle();if(ee)throw ee;if(!entry||entry.payment_status!=='paid'||entry.entry_status!=='registered'||entry.tournament_events.status!=='open')return NextResponse.json({error:'A confirmed paid entry is required.'},{status:403});const nonce=crypto.randomUUID();const {data,error}=await db.from('tournament_results').insert({tournament_id:tournamentId,entry_id:entry.id,user_id:user.id,score,duration_ms:duration,verification_status:'pending_review',review_note:'Client-submitted score; awaiting server-side anti-cheat review.'}).select('id,verification_status,created_at').single();if(error){if(error.code==='23505')return NextResponse.json({error:'A score has already been submitted for this tournament.'},{status:409});throw error}await db.from('tournament_audit_log').insert({actor_user_id:user.id,action:'submit_score',target_type:'tournament_result',target_id:data.id,metadata:{score,duration_ms:duration,nonce}});return NextResponse.json({result:data})}catch(e){console.error('Score submission:',e.message);return NextResponse.json({error:'Unable to submit score.'},{status:503})}}
+
+export const runtime = 'nodejs'
+
+// Cash-prize score acceptance is intentionally blocked until the game submits
+// a server-verifiable replay/proof rather than a client-reported score.
+export async function POST() {
+  if (process.env.SHADOW_STRIKE_CASH_ENABLED !== 'true') {
+    return NextResponse.json({ error: 'Cash tournament score submissions are disabled.' }, { status: 409 })
+  }
+  return NextResponse.json({
+    error: 'Cash-prize scoring is not available until server-authoritative replay verification is implemented and audited.'
+  }, { status: 503 })
+}
