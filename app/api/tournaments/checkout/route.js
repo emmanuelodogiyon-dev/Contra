@@ -62,7 +62,7 @@ export async function POST(request) {
     try {
       const origin = new URL(request.url).origin
       checkout = await initializeKoraCharge({
-        amount: event.entry_fee_minor,
+        amount: event.entry_fee_minor / 100,
         currency: event.currency,
         reference,
         redirect_url: `${origin}/tournaments/payment-result`,
