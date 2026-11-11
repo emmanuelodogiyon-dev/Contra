@@ -17,6 +17,8 @@ export default function TournamentLobby() {
   const [displayName, setDisplayName] = useState('')
   const [register, setRegister] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [prizes, setPrizes] = useState({ results: [], payouts: [] })
+  const [payoutForm, setPayoutForm] = useState({ resultId: '', bankCode: '', bankName: '', accountNumber: '' })
 
   useEffect(() => {
     const supabase = getSupabase()
@@ -25,6 +27,21 @@ export default function TournamentLobby() {
     fetch('/api/tournaments/events', { cache: 'no-store' }).then(r => r.json()).then(data => setEvents(data.events || [])).catch(() => setNotice('Cash tournament listings are temporarily unavailable.'))
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!session?.access_token) { setPrizes({ results: [], payouts: [] }); return }
+    fetch('/api/tournaments/my-prizes', { headers: { Authorization: 'Bearer ' + session.access_token }, cache: 'no-store' }).then(r => r.json()).then(d => setPrizes({ results: d.results || [], payouts: d.payouts || [] })).catch(() => {})
+  }, [session])
+
+  async function requestPrizePayout(event) {
+    event.preventDefault(); setBusy(true); setNotice('Verifying bank details and submitting payout request…')
+    try {
+      const response = await fetch('/api/tournaments/payout-request', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify(payoutForm) })
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Payout request failed')
+      setNotice('Payout request submitted for admin review.'); setPayoutForm({ resultId: '', bankCode: '', bankName: '', accountNumber: '' })
+      const refreshed = await fetch('/api/tournaments/my-prizes', { headers: { Authorization: 'Bearer ' + session.access_token }, cache: 'no-store' }); const d = await refreshed.json(); setPrizes({ results: d.results || [], payouts: d.payouts || [] })
+    } catch (error) { setNotice(error.message) } finally { setBusy(false) }
+  }
 
   async function authenticate(event) {
     event.preventDefault()
@@ -92,6 +109,18 @@ export default function TournamentLobby() {
         <button className="tournament-join" type="button" disabled={busy} onClick={() => enterTournament(event.id)}>Pay entry with Kora</button>
       </article>)}</div> : <p className="tournament-empty">No cash tournaments are open for registration yet. Your tournament system is installed; create and approve an event when the payment and competition settings are ready.</p>}
 
+      {session && prizes.results.some(r => r.payout_amount_minor && r.verification_status === "approved") && <>
+        <h3 className="tournament-section-title">My prizes & bank payout</h3>
+        <form className="tournament-payout-form" onSubmit={requestPrizePayout}>
+          <label>Approved prize<select required value={payoutForm.resultId} onChange={e => setPayoutForm({ ...payoutForm, resultId: e.target.value })}><option value="">Choose prize</option>{prizes.results.filter(r => r.payout_amount_minor && r.verification_status === "approved").map(r => <option key={r.id} value={r.id}>{new Intl.NumberFormat("en-NG",{style:"currency",currency:"NGN"}).format(r.payout_amount_minor/100)} • {r.score.toLocaleString()} points</option>)}</select></label>
+          <label>Bank name<input required value={payoutForm.bankName} onChange={e => setPayoutForm({ ...payoutForm, bankName: e.target.value })} placeholder="e.g. Access Bank" /></label>
+          <label>Korapay bank code<input required value={payoutForm.bankCode} onChange={e => setPayoutForm({ ...payoutForm, bankCode: e.target.value })} placeholder="e.g. 044" /></label>
+          <label>Account number<input required inputMode="numeric" maxLength={10} value={payoutForm.accountNumber} onChange={e => setPayoutForm({ ...payoutForm, accountNumber: e.target.value })} placeholder="10-digit account number" /></label>
+          <button className="tournament-join" disabled={busy || !session}>Submit bank payout request</button>
+          <small>Account details are encrypted before storage and verified through Korapay. Requests require admin approval.</small>
+        </form>
+        {prizes.payouts.map(p => <p className="tournament-feedback" key={p.id}>{p.bank_name} • {p.status} • {new Intl.NumberFormat("en-NG",{style:"currency",currency:"NGN"}).format(p.amount_minor/100)}</p>)}
+      </>}
       <h3 className="tournament-section-title">Free practice</h3>
       <div className="tournament-grid">{DEMO_EVENTS.map(event => <article className="tournament-card" key={event.id}><div className="tournament-card-top"><span>OPEN PRACTICE</span><span>FREE</span></div><h3>{event.name}</h3><p>{event.mode}</p><dl><div><dt>Players</dt><dd>{event.players}</dd></div><div><dt>Entry</dt><dd>No entry fee</dd></div><div><dt>Reward</dt><dd>Practice leaderboard</dd></div></dl><span className="tournament-practice-note">Practice mode only</span></article>)}</div>
       {notice && <p className="tournament-feedback" role="status">{notice}</p>}
