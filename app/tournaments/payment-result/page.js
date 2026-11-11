@@ -21,7 +21,7 @@ export default function TournamentPaymentResult() {
       const result = await response.json()
       if (cancelled) return
       if (!response.ok) { setMessage(result.error || 'Payment status is not available yet.'); setState('unknown'); return }
-      if (result.payment.payment_status === 'paid') { setMessage('Payment confirmed. Your tournament entry is registered.'); setState('success'); clearInterval(interval) }
+      if (result.payment.payment_status === 'paid') { window.sessionStorage.setItem('shadow-strike-active-tournament', result.payment.tournament_id); setMessage('Payment confirmed. Your tournament entry is registered. Start your run from the game.'); setState('success'); clearInterval(interval) }
       else if (['failed','initialization_failed','refunded'].includes(result.payment.payment_status)) { setMessage('This payment was not completed. Your tournament entry is not active.'); setState('failed'); clearInterval(interval) }
       else { setMessage('Payment is still pending. This page will check again automatically.'); setState('pending') }
     }
