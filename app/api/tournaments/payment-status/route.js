@@ -17,7 +17,7 @@ export async function GET(request) {
     const reference = new URL(request.url).searchParams.get('reference') || ''
     const admin = getAdminSupabase()
     const { data, error } = await admin.from('tournament_entries')
-      .select('payment_status,entry_status,amount_minor,currency')
+      .select('tournament_id,payment_status,entry_status,amount_minor,currency')
       .eq('payment_reference', reference).eq('user_id', user.id).maybeSingle()
     if (error) throw error
     if (!data) return NextResponse.json({ error: 'Payment record not found.' }, { status: 404 })
