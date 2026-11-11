@@ -37,7 +37,8 @@ export async function POST(request) {
       const allowed = ['draft','open','locked','completed','cancelled']
       if (!allowed.includes(body.status) || !body.eventId) return NextResponse.json({ error: 'Invalid event update.' }, { status: 400 })
       const update = { status: body.status, updated_at: new Date().toISOString() }
-      if (typeof body.cashEnabled === 'boolean') update.cash_enabled = body.cashEnabled && process.env.SHADOW_STRIKE_CASH_ENABLED === 'true'
+      if (body.cashEnabled === true && process.env.SHADOW_STRIKE_CASH_ENABLED !== 'true') return NextResponse.json({ error: 'Cash competitions are disabled by the server launch switch.' }, { status: 409 })
+      if (typeof body.cashEnabled === 'boolean') update.cash_enabled = body.cashEnabled
       const { data, error } = await admin.from('tournament_events').update(update).eq('id', body.eventId).select().single()
       if (error) throw error
       return NextResponse.json({ event: data })
