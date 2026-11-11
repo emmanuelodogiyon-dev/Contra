@@ -12,7 +12,7 @@ export async function POST(request) {
     if (!token) return NextResponse.json({ error: 'Sign in before entering a tournament.' }, { status: 401 })
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ifvteqtimhisrweaihid.supabase.co'
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_5aPcEtQvyw8xReetWalPSA_OHtyQXn8'
     if (!anonKey) return NextResponse.json({ error: 'Supabase publishable key is not configured.' }, { status: 503 })
     const authClient = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } })
     const { data: { user }, error: authError } = await authClient.auth.getUser(token)
