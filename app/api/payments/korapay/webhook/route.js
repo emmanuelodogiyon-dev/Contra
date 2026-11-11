@@ -2,63 +2,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '../../../../../lib/server/supabase-admin'
 import { getKoraSecret } from '../../../../../lib/server/korapay'
-
-export const runtime = 'nodejs'
-
-function validSignature(data, signature, secret) {
-  if (!signature || typeof signature !== 'string') return false
-  const expected = createHmac('sha256', secret).update(JSON.stringify(data)).digest('hex')
-  const suppliedBuffer = Buffer.from(signature, 'hex')
-  const expectedBuffer = Buffer.from(expected, 'hex')
-  return suppliedBuffer.length === expectedBuffer.length && timingSafeEqual(suppliedBuffer, expectedBuffer)
-}
-
-export async function POST(request) {
-  try {
-    const payload = await request.json()
-    const data = payload?.data
-    const signature = request.headers.get('x-korapay-signature')
-    if (!data || !validSignature(data, signature, getKoraSecret())) {
-      return NextResponse.json({ received: false, error: 'Invalid signature' }, { status: 401 })
-    }
-
-    const reference = String(data.reference || '')
-    if (!reference || !['charge.success', 'charge.failed'].includes(payload.event)) {
-      return NextResponse.json({ received: true })
-    }
-
-    const admin = getAdminSupabase()
-    const { data: entry, error: lookupError } = await admin
-      .from('tournament_entries')
-      .select('id,amount_minor,currency,payment_status')
-      .eq('payment_reference', reference)
-      .maybeSingle()
-    if (lookupError) throw lookupError
-    if (!entry) return NextResponse.json({ received: true })
-
-    const paidAmount = Number(data.amount)
-    const isSuccessful = payload.event === 'charge.success'
-      && data.status === 'success'
-      && data.currency === entry.currency
-      && Number.isFinite(paidAmount)
-      && Math.round(paidAmount * 100) === entry.amount_minor
-
-    if (entry.payment_status === 'paid') return NextResponse.json({ received: true, duplicate: true })
-
-    const { error: updateError } = await admin
-      .from('tournament_entries')
-      .update({
-        payment_status: isSuccessful ? 'paid' : 'failed',
-        entry_status: isSuccessful ? 'registered' : 'payment_failed',
-        paid_at: isSuccessful ? new Date().toISOString() : null,
-        provider_payload: payload,
-      })
-      .eq('id', entry.id)
-      .neq('payment_status', 'paid')
-    if (updateError) throw updateError
-    return NextResponse.json({ received: true })
-  } catch (error) {
-    console.error('Kora webhook processing error:', error.message)
-    return NextResponse.json({ received: false }, { status: 500 })
-  }
-}
+export const runtime='nodejs'
+function validSignature(data,signature,secret){if(!signature||typeof signature!=='string')return false;const expected=createHmac('sha256',secret).update(JSON.stringify(data)).digest('hex');const a=Buffer.from(signature,'hex'),b=Buffer.from(expected,'hex');return a.length===b.length&&timingSafeEqual(a,b)}
+export async function POST(request){try{const payload=await request.json(),data=payload?.data,signature=request.headers.get('x-korapay-signature');if(!data||!validSignature(data,signature,getKoraSecret()))return NextResponse.json({received:false,error:'Invalid signature'},{status:401});const event=String(payload.event||''),reference=String(data.reference||'');if(!reference||!['charge.success','charge.failed','transfer.success','transfer.failed'].includes(event))return NextResponse.json({received:true});const db=getAdminSupabase();const {error:dedupeError}=await db.from('korapay_webhook_events').insert({event_type:event,provider_reference:reference,payload});if(dedupeError?.code==='23505')return NextResponse.json({received:true,duplicate:true});if(dedupeError)throw dedupeError;
+if(event.startsWith('charge.')){const {data:entry,error}=await db.from('tournament_entries').select('id,tournament_id,amount_minor,currency,payment_status').eq('payment_reference',reference).maybeSingle();if(error)throw error;if(!entry)return NextResponse.json({received:true});if(entry.payment_status==='paid')return NextResponse.json({received:true,duplicate:true});const paid=event==='charge.success'&&data.status==='success'&&data.currency===entry.currency&&Number.isFinite(Number(data.amount))&&Math.round(Number(data.amount)*100)===entry.amount_minor;if(paid){const {error:le}=await db.from('tournament_ledger').insert({tournament_id:entry.tournament_id,entry_id:entry.id,kind:'entry_fee',amount_minor:entry.amount_minor,currency:entry.currency,reference:'ENTRY-'+reference,description:'Confirmed Korapay tournament entry'});if(le&&le.code!=='23505')throw le;}const {error:ue}=await db.from('tournament_entries').update({payment_status:paid?'paid':'failed',entry_status:paid?'registered':'payment_failed',paid_at:paid?new Date().toISOString():null,provider_payload:payload}).eq('id',entry.id).neq('payment_status','paid');if(ue)throw ue;return NextResponse.json({received:true});}
+const status=event==='transfer.success'&&data.status==='success'?'paid':'failed';const {data:payout,error:pe}=await db.from('tournament_payout_requests').select('id,tournament_id,user_id,amount_minor,currency,status').eq('kora_reference',reference).maybeSingle();if(pe)throw pe;if(!payout)return NextResponse.json({received:true});if(payout.status==='paid'||payout.status==='failed')return NextResponse.json({received:true,duplicate:true});if(status==='paid'&&(data.currency!==payout.currency||Math.round(Number(data.amount)*100)!==payout.amount_minor))throw new Error('Payout webhook amount/currency mismatch');const {error:pu}=await db.from('tournament_payout_requests').update({status,paid_at:status==='paid'?new Date().toISOString():null,failure_reason:status==='failed'?'Korapay reported transfer failure':null,updated_at:new Date().toISOString()}).eq('id',payout.id).eq('status','processing');if(pu)throw pu;if(status==='paid'){const {error:le}=await db.from('tournament_ledger').insert({tournament_id:payout.tournament_id,user_id:payout.user_id,payout_request_id:payout.id,kind:'payout',amount_minor:-payout.amount_minor,currency:payout.currency,reference:'PAYOUT-'+reference,description:'Korapay tournament prize payout'});if(le&&le.code!=='23505')throw le;}return NextResponse.json({received:true});}catch(error){console.error('Korapay webhook processing:',error.message);return NextResponse.json({received:false},{status:500})}}
