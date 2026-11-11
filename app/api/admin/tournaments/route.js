@@ -73,9 +73,9 @@ export async function POST(request) {
       const { data: payout, error: pe } = await admin.from('tournament_payout_requests').select('id,status,result_id').eq('id', body.payoutId).single()
       if (pe) throw pe
       if (payout.status !== 'pending_review') return NextResponse.json({ error: 'Payout is not awaiting review.' }, { status: 409 })
-      const { data: result, error: re } = await admin.from('tournament_results').select('verification_status,payout_amount_minor').eq('id', payout.result_id).single()
+      const { data: result, error: re } = await admin.from('tournament_results').select('verification_status,payout_amount_minor,reviewed_by').eq('id', payout.result_id).single()
       if (re) throw re
-      if (result.verification_status !== 'approved' || !result.payout_amount_minor) return NextResponse.json({ error: 'Prize result is not approved.' }, { status: 409 })
+      if (result.verification_status !== 'approved' || !result.payout_amount_minor || result.reviewed_by === user.id) return NextResponse.json({ error: 'Prize result must be approved by a different reviewer.' }, { status: 409 })
       const { data, error } = await admin.from('tournament_payout_requests').update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', payout.id).eq('status', 'pending_review').select('id,status').single()
       if (error) throw error
       return NextResponse.json({ payout: data })
