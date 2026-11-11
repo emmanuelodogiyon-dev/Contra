@@ -6,6 +6,7 @@ import { initializeKoraCharge } from '../../../../lib/server/korapay'
 export const runtime = 'nodejs'
 
 export async function POST(request) {
+  if (process.env.SHADOW_STRIKE_CASH_ENABLED !== 'true') return NextResponse.json({ error: 'Cash tournament entry is not enabled.' }, { status: 409 })
   try {
     const authorization = request.headers.get('authorization') || ''
     const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
