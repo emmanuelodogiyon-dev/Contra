@@ -43,6 +43,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'This tournament has ended.' }, { status: 409 })
     }
 
+    const { count: activeEntries, error: countError } = await admin.from('tournament_entries').select('id', { count: 'exact', head: true }).eq('tournament_id', event.id).eq('payment_status', 'paid')
+    if (countError) throw countError
+    if ((activeEntries || 0) >= event.max_players) return NextResponse.json({ error: 'This tournament is full.' }, { status: 409 })
+
     const reference = `SS-${crypto.randomUUID().replaceAll('-', '').toUpperCase()}`
     const { error: entryError } = await admin.from('tournament_entries').insert({
       tournament_id: event.id,
