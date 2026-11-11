@@ -4,6 +4,7 @@ import { getAdminSupabase } from '../../../../lib/server/supabase-admin'
 export const runtime = 'nodejs'
 
 export async function GET() {
+  if (process.env.SHADOW_STRIKE_CASH_ENABLED !== 'true') return NextResponse.json({ events: [] })
   try {
     const admin = getAdminSupabase()
     const { data, error } = await admin
