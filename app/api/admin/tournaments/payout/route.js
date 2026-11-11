@@ -8,7 +8,7 @@ export async function POST(request){
  let payoutId=''
  try{
   const b=await request.json();payoutId=String(b.payoutId||'');if(!/^[0-9a-f-]{36}$/i.test(payoutId))return NextResponse.json({error:'Invalid payout request.'},{status:400})
-  if(process.env.KORAPAY_PAYOUTS_ENABLED!=='true')return NextResponse.json({error:'Payout processing is disabled until Kora test verification and approval are complete.'},{status:409})
+  if(process.env.SHADOW_STRIKE_CASH_ENABLED!=='true'||process.env.KORAPAY_PAYOUTS_ENABLED!=='true')return NextResponse.json({error:'Payout processing is disabled until cash competitions and Korapay payouts are approved for launch.'},{status:409})
   const {data:p,error}=await auth.admin.from('tournament_payout_requests').select('*,tournament_results!inner(verification_status)').eq('id',payoutId).maybeSingle();if(error)throw error
   if(!p||p.status!=='approved'||p.tournament_results.verification_status!=='approved'||p.approved_by===auth.user.id)return NextResponse.json({error:'Payout must be approved by a different admin and linked to an approved result.'},{status:409})
   const reference='SS-PAYOUT-'+p.id.replaceAll('-','').toUpperCase()
