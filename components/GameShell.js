@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { saveScore } from '../lib/scores'
+import { getSupabase } from '../lib/supabase'
 import { createAudio } from '../lib/audio'
 import SocialBarAds from './SocialBarAds'
 
@@ -28,6 +29,16 @@ export default function GameShell(){
     let camera=0,checkpoint=0,waveCursor=0,transition=2.2,bossSpawned=false,current=LEVELS[levelIndex],boss=null
     const player={x:120,y:GROUND-76,w:46,h:76,vx:0,vy:0,grounded:true,facing:1,cooldown:0,invuln:0}
     const bullets=[],enemyBullets=[],enemies=[],particles=[],pickups=[]
+    async function submitTournamentResult(finalScore){
+      const tournamentId=window.sessionStorage.getItem('shadow-strike-active-tournament')
+      if(!tournamentId)return
+      try{
+        const {data:{session}}=await getSupabase().auth.getSession()
+        if(!session?.access_token)return
+        const response=await fetch('/api/tournaments/score',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({tournamentId,score:finalScore,durationMs:Math.max(1000,Math.floor(gameTime*1000))})})
+        if(response.ok)window.sessionStorage.removeItem('shadow-strike-active-tournament')
+      }catch(error){console.error('Tournament score submission failed:',error)}
+    }
     const upperPlatforms=()=>{
       const step=levelIndex%2?620:700
       return Array.from({length:Math.ceil(current.length/step)},(_,i)=>({x:360+i*step,y:300-(i%3)*48,w:210+(i%2)*45,h:16}))
@@ -67,7 +78,7 @@ export default function GameShell(){
     function spawnBoss(){bossSpawned=true;const hp=28+levelIndex*10;boss={x:current.length+520,y:326,w:126,h:132,hp,maxHp:hp,cooldown:1,phase:1,alive:true};audio.boss()}
     function dropPickup(x,y){if(Math.random()<.24)pickups.push({x,y,w:24,h:24,type:Math.random()<.7?'medal':'life',vy:-130})}
     function damagePlayer(){if(player.invuln>0||transition>0)return;localLives--;setLives(localLives);player.invuln=1.4;burst(player.x+23,player.y+38,18);audio.damage();if(localLives<=0){setStatus('failed');setStarted(false);saveScore(localScore);audio.gameOver();return}player.x=Math.max(80,checkpoint+120);player.y=GROUND-player.h;player.vx=0;player.vy=0;player.grounded=true;camera=Math.max(0,checkpoint);enemies.splice(0);enemyBullets.splice(0);waveCursor=Math.max(waveCursor,checkpoint)}
-    function nextLevel(){localScore+=1500+levelIndex*500;setScore(localScore);if(levelIndex===LEVELS.length-1){setStatus('victory');setStarted(false);saveScore(localScore);audio.victory();return}levelIndex++;current=LEVELS[levelIndex];setLevel(levelIndex+1);camera=0;checkpoint=0;waveCursor=0;bossSpawned=false;boss=null;platforms=upperPlatforms();bullets.splice(0);enemyBullets.splice(0);enemies.splice(0);pickups.splice(0);player.x=120;player.y=GROUND-player.h;player.vx=0;player.vy=0;player.grounded=true;player.invuln=1.4;transition=2.2;audio.level()}
+    function nextLevel(){localScore+=1500+levelIndex*500;setScore(localScore);if(levelIndex===LEVELS.length-1){setStatus('victory');setStarted(false);saveScore(localScore);submitTournamentResult(localScore);audio.victory();return}levelIndex++;current=LEVELS[levelIndex];setLevel(levelIndex+1);camera=0;checkpoint=0;waveCursor=0;bossSpawned=false;boss=null;platforms=upperPlatforms();bullets.splice(0);enemyBullets.splice(0);enemies.splice(0);pickups.splice(0);player.x=120;player.y=GROUND-player.h;player.vx=0;player.vy=0;player.grounded=true;player.invuln=1.4;transition=2.2;audio.level()}
     function updatePlayer(dt){
       const left=keys.has('ArrowLeft')||keys.has('KeyA')||keys.has('PadLeft'),right=keys.has('ArrowRight')||keys.has('KeyD')||keys.has('PadRight')
       player.vx=transition>0?0:(right-left)*245;if(player.vx)player.facing=Math.sign(player.vx)
