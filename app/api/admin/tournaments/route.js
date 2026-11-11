@@ -59,14 +59,15 @@ export async function POST(request) {
     if (body.action === 'award_prize') {
       const amount = Number(body.amountNaira)
       if (!body.resultId || !Number.isSafeInteger(amount) || amount < 1 || amount > 100000000) return NextResponse.json({ error: 'Enter a valid prize amount.' }, { status: 400 })
-      const { data: result, error: re } = await admin.from('tournament_results').select('id,tournament_id,user_id,verification_status,awarded_at').eq('id', body.resultId).single()
+      const { data: result, error: re } = await admin.from('tournament_results').select('id,verification_status,reviewed_by,awarded_at').eq('id', body.resultId).maybeSingle()
       if (re) throw re
-      if (result.verification_status !== 'approved' || result.awarded_at) return NextResponse.json({ error: 'Only an unawarded approved result can receive a prize.' }, { status: 409 })
-      const { error: le } = await admin.from('tournament_ledger').insert({ tournament_id: result.tournament_id, user_id: result.user_id, kind: 'prize_award', amount_minor: amount * 100, currency: 'NGN', reference: 'PRIZE-' + result.id, description: 'Admin-approved tournament prize' })
-      if (le) throw le
-      const { error: ue } = await admin.from('tournament_results').update({ payout_amount_minor: amount * 100, awarded_at: new Date().toISOString() }).eq('id', result.id).is('awarded_at', null)
-      if (ue) throw ue
-      return NextResponse.json({ awarded: true })
+      if (!result || result.verification_status !== 'approved' || result.awarded_at || !result.reviewed_by || result.reviewed_by === user.id) return NextResponse.json({ error: 'An approved, unawarded result reviewed by a different administrator is required.' }, { status: 409 })
+      const { data, error } = await admin.rpc('admin_award_tournament_prize', { p_result_id: body.resultId, p_amount_minor: amount * 100, p_actor: user.id })
+      if (error) {
+        if (/already been awarded|differ from score reviewer|approved result/i.test(error.message)) return NextResponse.json({ error: error.message }, { status: 409 })
+        throw error
+      }
+      return NextResponse.json(data || { awarded: true })
     }
     if (body.action === 'approve_payout') {
       if (!body.payoutId) return NextResponse.json({ error: 'Payout request is required.' }, { status: 400 })
