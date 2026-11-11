@@ -4,7 +4,8 @@ import { getSupabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function TournamentAdminPage(){
- const [session,setSession]=useState(null),[data,setData]=useState({events:[],entries:[],results:[],payouts:[],ledger:[]}),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false)
+ const router=useRouter()
+ const [session,setSession]=useState(null),[authorized,setAuthorized]=useState(false),[data,setData]=useState({events:[],entries:[],results:[],payouts:[],ledger:[]}),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false)
  const [form,setForm]=useState({name:'',description:'',entryFeeNaira:'100',maxPlayers:'32',rules:''})
  const [prizeAmounts,setPrizeAmounts]=useState({})
  async function load(s=session){if(!s?.access_token)return;const r=await fetch('/api/admin/tournaments',{headers:{Authorization:'Bearer '+s.access_token},cache:'no-store'});const d=await r.json();if(!r.ok){setAuthorized(false);throw new Error(d.error||'Admin access denied')}setData(d);setAuthorized(true)}
