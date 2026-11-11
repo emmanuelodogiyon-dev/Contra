@@ -12,7 +12,7 @@ export async function POST(request){
   const {data:p,error}=await auth.admin.from('tournament_payout_requests').select('*,tournament_results!inner(verification_status)').eq('id',payoutId).maybeSingle();if(error)throw error
   if(!p||p.status!=='approved'||p.tournament_results.verification_status!=='approved'||p.approved_by===auth.user.id)return NextResponse.json({error:'Payout must be approved by a different admin and linked to an approved result.'},{status:409})
   const reference='SS-PAYOUT-'+p.id.replaceAll('-','').toUpperCase()
-  const {data:claimed,error:claimError}=await auth.admin.from('tournament_payout_requests').update({status:'processing',kora_reference:reference,updated_at:new Date().toISOString()}).eq('id',payoutId).eq('status','approved').select('id').maybeSingle()
+  const {data:claimed,error:claimError}=await auth.admin.from('tournament_payout_requests').update({status:'processing',kora_reference:reference,initiated_by:auth.user.id,updated_at:new Date().toISOString()}).eq('id',payoutId).eq('status','approved').select('id').maybeSingle()
   if(claimError)throw claimError;if(!claimed)return NextResponse.json({error:'This payout is already being processed.'},{status:409})
   const account=decryptAccount(p.account_number_encrypted)
   const {data:userData}=await auth.admin.auth.admin.getUserById(p.user_id)
